@@ -1,0 +1,161 @@
+Mega Evolutions in Essentials
+IMPORTANT NOTE: Remember, to find something in all the scripts, use Ctrl + Shift + F to search all scripts
+
+Resources Used
+
+##########################################PokeBattle_Battle##########################################
+@megaEvolution: The Value if Player 0 or 1 (On your side) or Player 0 or 1 (On Enemy Side) can Mega Evolve the Pokemon
+	Implemented as @megaEvolution[side][owner]
+	If the value is -1, it has been initialized
+	If the value is -2, the pokemon cannot mega evolve anymore
+	If the value is positive, it is in the process of mega evolution
+	Also has Accessor Defined, meaning it can be accesssed from other scripts easily
+	>Also accessed in	-pbRegisterSwitch
+						-pbRegisterItem
+						-pbCommandPhase to reset @megaEvolution to -1 to redo mega evolving if something went wrong, on 4 occasions
+						
+pbCanMegaEvolve?: Function that returns true when
+						-Megas are not turned off (NO_MEGA_EVOLUTION == false)
+						-The pokemon at the index does not has Mega Evolution (.hasMega? returns false)
+						-The pokemon belongs to the player at the index and that player has a Mega Ring (pbBelongsToPlayer?(index) && !$PokemonGlobal.megaRing)
+						AND
+						-The player has not mega evolved yet (The @megaEvolution value has only been initialized) (@megaEvolution[side][owner]!=-1)
+						Otherwise it is false
+						
+bRegisterMegaEvolution: Function that makes a pokemon either able or not able to mega evolve
+	Takes in one parameter: index
+	It finds the player at the index (on the correct side and the correct player on that side)
+	Sets @megaEvolution[side][owner]=index , making it able to mega evolve or not, depending on the index
+
+pbMegaEvolve: Function that makes the pokemon at the index mega evolve
+	It will only work if:
+						-There is a trainer and a pokemon at that index (!@battlers[index] || !@battlers[index].pokemon)
+						-The pokemon does not have a mega evolutions (!@battlers[index].hasMega?)
+						-The pokemon is already mega (@battlers[index].isMega?)
+	It will then display that the pokemon is reacting ("{Name of player}'s {Name of Pokemone} is reacting to {Name of Player}'s Mega Ring!")
+	It then does the mega evolution animation (pbCommonAnimation("MegaEvolution",@battlers[index],nil))
+	It then changes the pokemon to the mega evolved form (@battlers[index].pokemon.makeMega)
+	Then it updates the sprite (@scene.pbChangePokemon(@battlers[index],@battlers[index].pokemon))
+	It updates the name of the pokemon (meganame=@battlers[index].pokemon.megaName)
+	It displays that it mega evolved ({Name of original pokemon} has Mega Evolved into {Name of new pokemon}!)
+	It appears in the debug menu ([{Name of origial pokemon} Mega Evolved])
+	It makes the owner not able to mega evolve again by setting the value of @megaEvolution to -2 (@megaEvolution[side][owner]=-2)
+	
+pbAttackPhase: Function executing the Attack phase.  Aka, the main function doing your turn
+	Each player's pokemon mega evolve on each side of the field if commanded to do so  (for i in priority -> if @megaEvolution[side][owner]==i.index -> pbMegaEvolve(i.index))
+	Calls pbMegaEvolve function and @megaEvolution variable.
+
+##########################################PokeBattle_Battler##########################################
+-These functions are not recursive, there are just more with the same name
+hasMega?: Function returns true if @pokemon.hasMegaForm? is true.  Otherwise, returns false
+
+isMega?: Function returns true if @pokemon.isMega? is true.  Otherwise, returns false
+	
+##########################################PokeBattle_AI##########################################
+pbEnemyShouldMegaEvolve?: Function that returns true if AI player can mega evolve pokemon (pbCanMegaEvolve?)
+	
+pbDefaultChooseEnemyCommand: Function that basically decides what the AI player should do
+	It mega evolves if it should mega evolve, referencing pbEnemyShouldMegaEvolve?, meaning it will always mega evolve if it can (pbRegisterMegaEvolution(index) if pbEnemyShouldMegaEvolve?(index))
+
+##########################################PokeBattle_Scene##########################################
+Graphics/Pictures/battleMegaEvoBox.png - The picture of the teeny Mega sprite
+Graphics/Pictures/battleMegaEvo - The picture of the Mega Evolution button
+
+@megaButton: The button that recieves the player's input on mega evolving
+		-If its value is 0, it is not visible
+		-If it is 1, it will appears
+		-If it is 2, it will still be visible, but slightly darker, because it is 'pressed' like a button
+		-Referenced in 
+			-FightMenuDisplay -> update function, i @buttons.update, updating the value of the @megaButton
+			-FightMenuButtons -> update to update the value of the megaEvolution button when the screen is refreshed
+					-if it has no value here, it is zero, meaning it would be invisible
+					-Calls refresh function
+			-FightMenuButtons -> refresh, to draw the image of the 'MEGA EVOLUTION' button
+		
+FightMenuButtons -> initialize -> @megaevobitmap: Variable that stores the link to the .bmp of the 'MEGA EVOLVE' button
+		-Referenced in: 
+			-FightMenuButtons -> dispose to get rid of the image from memory, after a battlers
+			-FightMenuButtons -> refresh, to draw the image of the 'MEGA EVOLUTION' button
+
+PokemonDataBox -> refresh Loads the Mega Evolution sprite of the pokemon if it is mega
+		-References isMega? function
+
+PokemonDataBox -> fightMenu: Function that displays the small options when looking at moves and stats when switching pokemon	
+		-creates object 'cw'
+		-sets the @megaButton value inside cw to 0
+		-Sets it to 1 if the pokemon can mega evolve (pbCanMegaEvolve?)
+		-if the input is 'A' (Input.trigger?(Input::A))
+			-Checks for mega evolution possibility (@battle.pbCanMegaEvolve?)
+			-Registers that mega evolution happened (pbRegisterMegaEvolution)
+			-sets cw.megaButton to 2, meaning it looks like it is clicked 
+			-plays the sounf effect when you press a button
+		
+##########################################PokeBattle_SafariZone##########################################
+okeBattle_FakeBattler -> isMega? Retruns false, meaning that all Safari zone pokemon will not be mega
+
+okeBattle_FakeBattler -> hasMega? Returns false, meaning all Safari Zone pokemon will not be able to mega evolve as opponents
+
+##########################################PField_Field##########################################
+pbWildBattle -> One section calls if any pokemon in the trainer's pokemon is mega and reverts them to unmega form, for each it is possible
+	-(for i in $Trainer.party; (i.makeUnmega rescue nil); end)
+	-Calls makeUnmega function
+	
+pbDoubleWildBattle -> Does same thing as above function, but for double wild battles.
+	-(for i in $Trainer.party; (i.makeUnmega rescue nil); end)
+	-Calls makeUnmega function
+	
+##########################################PField_RoamingPokemon##########################################
+pbRoamingPokemonBattle -> One section calls if any pokemon in the trainer's pokemon is mega and reverts them to unmega form, for each it is possible
+	-Happens in a battle against a roaming pokemon
+	-(for i in $Trainer.party; (i.makeUnmega rescue nil); end)
+	-Calls makeUnmega function
+	
+##########################################PField_Map##########################################
+initialize -> @megaRing: The value that declares if the player should be able to mega evolve at all
+	-not the same as NO_MEGA_EVOLUTION
+	-Initially false, must be true to mega evolve
+	-Has Attributor accessor, so it can be accessed easily from other classes
+	
+##########################################PTrainer_NPCTrainers##########################################
+--Basically the same as in PField_Field, but for trainer battles
+pbTrainerBattle -> One section calls if any pokemon in the trainer's pokemon is mega and reverts them to unmega form, for each it is possible
+	-(for i in $Trainer.party; (i.makeUnmega rescue nil); end)
+	-Calls makeUnmega function
+	
+pbDoubleTrainerBattle -> Does same thing as above function, but for double trainer battles.
+	-(for i in $Trainer.party; (i.makeUnmega rescue nil); end)
+	-Calls makeUnmega function
+	
+##########################################Pokemon_MultipleForms##########################################
+Many of these functions are called from the PokeBattle_Battler 
+
+PokeBattle_Pokemon -> hasMegaForm?: Checks for the mega form in the MultipleForms section (calls getMegaForm, referencing its own name)
+	-Returns true if the pokemon has a mega form
+
+PokeBattle_Pokemon -> isMega?: Checks if the pokemon is mega already by finding it in the MultipleForms section, nd checking if it is not that mega
+							   already, or has a mega at all	 (calls getMegaForm, referencing its own name, and checks if that is not the pokemon's current name)
+	-Returns true if the pokemon has a mega form and is not mega already
+
+PokeBattle_Pokemon -> makeMega: Makes the pokemon's form into the mega form (calls getMegaForm using its name, from MultipleForms)
+
+PokeBattle_Pokemon -> makeUnmega: Makes the pokemon's form into the unmega form- the original form(calls getUnmegaForm using its name, from MultipleForms)
+
+PokeBattle_Pokemon -> megaName: Calls getMegaName from MultipleForms 
+	-Returns the mega pokemon's name, if it has one
+	
+MultipleForms.register() -> Function that registers all the info about the megas, using the above methods
+
+##########################################Debug##########################################
+These Are obvious
+Toggling Mega ring ownership
+	"togglemegaring",_INTL("Toggle Mega Ring Ownership")
+		-Referenced again, When player either Loses or gains a mega Ring
+			-Kernel.pbMessage(_INTL("Gave Mega Ring.")) if $PokemonGlobal.megaRing
+			-Kernel.pbMessage(_INTL("Lost Mega Ring.")) if !$PokemonGlobal.megaRing
+
+
+##########################################Settings##########################################
+NO_MEGA_EVOLUTION - Flag set that disables Mega Evolutions	
+	Value = 34
+	
+
